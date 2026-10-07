@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BobaFit 手搖飲熱量換算器 Pro</title>
+  <style>
+    :root {
+      --bg: #fffbf5;
+      --card: #ffffff;
+      --primary: #f97316;
+      --primary-hover: #ea580c;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #f1e5d8;
+      --tea-color: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px 16px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+    .container { max-width: 920px; width: 100%; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; }
+    @media (max-width: 820px) { .container { grid-template-columns: 1fr; } }
+    
+    header { grid-column: 1 / -1; text-align: center; margin-bottom: 8px; }
+    header h1 { font-size: 2rem; color: var(--primary); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 6px; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 22px; box-shadow: 0 8px 24px rgba(249, 115, 22, 0.06); }
+    .section-title { font-size: 0.95rem; font-weight: 700; margin: 14px 0 8px; color: #334155; display: flex; align-items: center; gap: 6px; }
+    .section-title:first-child { margin-top: 0; }
+    
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn-option { flex: 1; min-width: 70px; text-align: center; padding: 8px 10px; border: 1.5px solid var(--border); background: #faf8f5; border-radius: 10px; cursor: pointer; font-size: 0.88rem; font-weight: 500; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); user-select: none; }
+    .btn-option:hover { border-color: var(--primary); transform: translateY(-1px); }
+    .btn-option.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; box-shadow: 0 4px 10px rgba(249, 115, 22, 0.25); }
+
+    /* 快捷功能列 */
+    .action-bar { display: flex; gap: 10px; margin-top: 18px; }
+    .action-btn { flex: 1; padding: 10px; border: none; border-radius: 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-random { background: #fef08a; color: #854d0e; }
+    .btn-random:hover { background: #fde047; }
+    .btn-reset { background: #f1f5f9; color: #475569; }
+    .btn-reset:hover { background: #e2e8f0; }
+
+    /* 手搖杯整體元件 */
+    .cup-area { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 270px; padding-top: 15px; }
+    .cup-wrapper { width: 140px; position: relative; display: flex; flex-direction: column; align-items: center; }
+    
+    /* 吸管：支援大杯平滑長高 */
+    .straw { 
+      width: 14px; 
+      height: 185px; /* 中杯吸管長度 */
+      background: repeating-linear-gradient(45deg, #ef4444, #ef4444 8px, #ffffff 8px, #ffffff 16px); 
+      position: absolute; 
+      top: -20px; 
+      left: 54%; 
+      transform: translateX(-50%) rotate(8deg); 
+      border-radius: 4px; 
+      z-index: 10; 
+      box-shadow: 1px 2px 5px rgba(0,0,0,0.15); 
+      transition: height 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .straw.large-straw {
+      height: 225px; /* 大杯吸管同步長高 */
+    }
+    
+    .cup-rim { 
+      width: 140px; height: 14px; 
+      background: #e2e8f0; 
+      border: 3px solid #64748b; 
+      border-radius: 8px; 
+      z-index: 5; 
+      position: relative; 
+    }
+    
+    .cup-body { 
+      width: 132px; 
+      height: 160px; /* 中杯預設高度 */
+      margin-top: -3px; 
+      background: rgba(255, 255, 255, 0.4); 
+      border: 3px solid #64748b; 
+      border-top: none; 
+      border-radius: 0 0 24px 24px; 
+      overflow: hidden; 
+      display: flex; flex-direction: column-reverse; 
+      backdrop-filter: blur(2px);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.06);
+      transition: height 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .cup-body.large-cup { 
+      height: 200px; /* 大杯高度 */
+    }
+
+    .cup-wrapper.shake { animation: shake 0.5s ease-in-out; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    .liquid { width: 100%; height: 88%; background: var(--tea-color); transition: background 0.4s ease; position: relative; display: flex; flex-direction: column-reverse; }
+    
+    /* 冰塊視覺 */
+    .ice-cubes { position: absolute; top: 6px; width: 100%; display: flex; justify-content: center; gap: 6px; z-index: 4; }
+    .ice { width: 22px; height: 18px; background: rgba(255, 255, 255, 0.65); border: 1.5px solid rgba(255, 255, 255, 0.85); border-radius: 4px; transform: rotate(12deg); backdrop-filter: blur(1px); }
+    
+    /* 配料沉積層（色彩重調，告別撞色） */
+    .topping-layer { width: 100%; transition: all 0.3s ease; }
+    .topping-pearl { background: radial-gradient(circle, #0f172a 65%, transparent 68%); background-size: 14px 14px; }
+    /* 椰果：半透明乳白椰果凍質感 + 晶亮微光紋理 */
+    .topping-jelly { 
+      background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85) 12px, rgba(241, 245, 249, 0.6) 12px, rgba(241, 245, 249, 0.6) 18px); 
+      border-top: 2px solid rgba(255, 255, 255, 0.95);
+      border-bottom: 1px solid rgba(203, 213, 225, 0.5);
+    }
+    /* 布丁：經典濃郁雞蛋布丁黃 + 焦糖底層 */
+    .topping-pudding { 
+      background: #facc15; 
+      border-top: 3px solid #78350f; /* 焦糖頂邊 */
+      box-shadow: inset 0 -3px 6px rgba(180, 83, 9, 0.2);
+    }
+    .topping-grass { background: #1e293b; border-top: 2px solid #0f172a; }
+
+    /* 熱量與代價儀表板 */
+    .stats-card { display: flex; flex-direction: column; gap: 14px; }
+    .calorie-box { text-align: center; padding: 16px; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border-radius: 16px; border: 1px solid #fed7aa; }
+    .calorie-num { font-size: 2.6rem; font-weight: 800; color: var(--primary); line-height: 1.1; }
+    .food-equiv { font-size: 0.88rem; color: #7c2d12; margin-top: 6px; font-weight: 500; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 700; margin-top: 8px; }
+
+    .exercise-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .exercise-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 12px 6px; text-align: center; }
+    .exercise-val { font-size: 1.15rem; font-weight: 700; color: #0284c7; margin-top: 4px; }
+    .exercise-title { font-size: 0.78rem; color: var(--text-muted); }
+    
+    .share-btn { width: 100%; padding: 12px; border: none; border-radius: 12px; background: #0f172a; color: #fff; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .share-btn:hover { background: #1e293b; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🧋 BobaFit 手搖飲熱量換算器 Pro</h1>
+    <p>自訂專屬手搖杯，即時預覽茶色、配料層與運動消耗代價！</p>
+  </header>
+
+  <div class="container">
+    <!-- 左側選單 -->
+    <div class="card">
+      <div class="section-title">📏 0. 杯型容量</div>
+      <div class="btn-group" id="sizeGroup">
+        <div class="btn-option active" data-scale="1.0">中杯 500ml</div>
+        <div class="btn-option" data-scale="1.4">大杯 700ml (x1.4)</div>
+      </div>
+
+      <div class="section-title">🍵 1. 茶湯基底</div>
+      <div class="btn-group" id="baseGroup">
+        <div class="btn-option active" data-type="base" data-name="無糖青茶" data-cal="0" data-color="#f59e0b">無糖青茶</div>
+        <div class="btn-option" data-type="base" data-name="鮮奶茶" data-cal="160" data-color="#fed7aa">鮮奶茶</div>
+        <div class="btn-option" data-type="base" data-name="厚奶茶" data-cal="280" data-color="#d97706">厚奶茶</div>
+        <div class="btn-option" data-type="base" data-name="抹茶拿鐵" data-cal="220" data-color="#84cc16">抹茶拿鐵</div>
+      </div>
+
+      <div class="section-title">🍬 2. 甜度設定</div>
+      <div class="btn-group" id="sugarGroup">
+        <div class="btn-option" data-type="sugar" data-name="無糖" data-cal="0">無糖 (0g)</div>
+        <div class="btn-option active" data-type="sugar" data-name="微糖" data-cal="60">微糖 (15g)</div>
+        <div class="btn-option" data-type="sugar" data-name="半糖" data-cal="100">半糖 (25g)</div>
+        <div class="btn-option" data-type="sugar" data-name="全糖" data-cal="200">全糖 (50g)</div>
+      </div>
+
+      <div class="section-title">🧊 3. 冰塊溫度</div>
+      <div class="btn-group" id="iceGroup">
+        <div class="btn-option" data-ice="0">完全去冰</div>
+        <div class="btn-option active" data-ice="2">微冰</div>
+        <div class="btn-option" data-ice="3">正常冰</div>
+      </div>
+
+      <div class="section-title">🧋 4. 加料區（可複選）</div>
+      <div class="btn-group" id="toppingGroup">
+        <div class="btn-option" data-name="波霸珍珠" data-cal="180" data-top="pearl">波霸珍珠 (+180k)</div>
+        <div class="btn-option" data-name="椰果" data-cal="120" data-top="jelly">椰果 (+120k)</div>
+        <div class="btn-option" data-name="布丁" data-cal="110" data-top="pudding">布丁 (+110k)</div>
+        <div class="btn-option" data-name="仙草凍" data-cal="40" data-top="grass">仙草凍 (+40k)</div>
+      </div>
+
+      <div class="action-bar">
+        <button class="action-btn btn-random" id="randomBtn">🎲 幫我隨機抽一杯！</button>
+        <button class="action-btn btn-reset" id="resetBtn">🔄 恢復預設</button>
+      </div>
+    </div>
+
+    <!-- 右側視覺與計算 -->
+    <div class="card stats-card">
+      <div class="section-title">✨ 杯中真實視覺呈現</div>
+      
+      <div class="cup-area">
+        <div class="cup-wrapper" id="cupWrapper">
+          <div class="straw" id="straw"></div>
+          <div class="cup-rim"></div>
+          <div class="cup-body" id="cupBody">
+            <div class="liquid" id="liquidBox">
+              <div class="ice-cubes" id="iceCubes">
+                <div class="ice"></div>
+                <div class="ice" style="transform: rotate(-15deg);"></div>
+              </div>
+              <div id="toppingContainer" style="width:100%; display:flex; flex-direction:column-reverse;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="calorie-box">
+        <div style="font-size: 0.85rem; color: var(--text-muted);">本杯估算總熱量</div>
+        <div class="calorie-num"><span id="totalCal">60</span> <span style="font-size: 1.2rem; font-weight: 500;">kcal</span></div>
+        <div class="food-equiv" id="foodEquiv">相當於約 0.2 碗白飯 🍚</div>
+        <span class="badge" id="warnBadge" style="background:#dcfce7; color:#166534;">負擔輕盈 🌱</span>
+      </div>
+
+      <div class="section-title">🏃 想消耗這杯，需要運動：</div>
+      <div class="exercise-grid">
+        <div class="exercise-box">
+          <div class="exercise-title">慢跑 (60kg)</div>
+          <div class="exercise-val" id="runVal">1.0 km</div>
+        </div>
+        <div class="exercise-box">
+          <div class="exercise-title">跳繩</div>
+          <div class="exercise-val" id="ropeVal">6 分鐘</div>
+        </div>
+        <div class="exercise-box">
+          <div class="exercise-title">爬樓梯</div>
+          <div class="exercise-val" id="stairsVal">600 階</div>
+        </div>
+      </div>
+
+      <button class="share-btn" id="shareBtn">📋 複製今日手搖飲小卡</button>
+    </div>
+  </div>
+
+  <script>
+    let sizeScale = 1.0;
+    let baseCal = 0;
+    let baseName = "無糖青茶";
+    let teaColor = "#f59e0b";
+    let sugarCal = 60;
+    let sugarName = "微糖";
+    let iceCount = 2;
+    let activeToppings = new Map();
+
+    const cupWrapper = document.getElementById('cupWrapper');
+    const cupBody = document.getElementById('cupBody');
+    const straw = document.getElementById('straw');
+    const liquidBox = document.getElementById('liquidBox');
+    const iceCubes = document.getElementById('iceCubes');
+    const toppingContainer = document.getElementById('toppingContainer');
+    const totalCalEl = document.getElementById('totalCal');
+    const warnBadge = document.getElementById('warnBadge');
+    const foodEquiv = document.getElementById('foodEquiv');
+    const runVal = document.getElementById('runVal');
+    const ropeVal = document.getElementById('ropeVal');
+    const stairsVal = document.getElementById('stairsVal');
+
+    function bindRadio(groupId, onSelect) {
+      const btns = document.querySelectorAll(`#${groupId} .btn-option`);
+      btns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          btns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          onSelect(btn);
+          updateApp();
+        });
+      });
+    }
+
+    bindRadio('sizeGroup', (btn) => {
+      sizeScale = parseFloat(btn.dataset.scale);
+      if (sizeScale > 1) {
+        cupBody.classList.add('large-cup');
+        straw.classList.add('large-straw');
+      } else {
+        cupBody.classList.remove('large-cup');
+        straw.classList.remove('large-straw');
+      }
+    });
+
+    bindRadio('baseGroup', (btn) => {
+      baseCal = parseInt(btn.dataset.cal);
+      baseName = btn.dataset.name;
+      teaColor = btn.dataset.color;
+    });
+
+    bindRadio('sugarGroup', (btn) => {
+      sugarCal = parseInt(btn.dataset.cal);
+      sugarName = btn.dataset.name;
+    });
+
+    bindRadio('iceGroup', (btn) => {
+      iceCount = parseInt(btn.dataset.ice);
+    });
+
+    const toppingBtns = document.querySelectorAll('#toppingGroup .btn-option');
+    toppingBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('active');
+        const key = btn.dataset.top;
+        const cal = parseInt(btn.dataset.cal);
+        const name = btn.dataset.name;
+
+        if (btn.classList.contains('active')) {
+          activeToppings.set(key, { cal, name });
+        } else {
+          activeToppings.delete(key);
+        }
+        updateApp();
+      });
+    });
+
+    function updateApp() {
+      let toppingCal = 0;
+      activeToppings.forEach(item => toppingCal += item.cal);
+      const subtotal = baseCal + sugarCal + toppingCal;
+      const total = Math.round(subtotal * sizeScale);
+      totalCalEl.innerText = total;
+
+      liquidBox.style.background = teaColor;
+
+      iceCubes.innerHTML = '';
+      for (let i = 0; i < iceCount; i++) {
+        const ice = document.createElement('div');
+        ice.className = 'ice';
+        ice.style.transform = `rotate(${i % 2 === 0 ? 12 : -15}deg)`;
+        iceCubes.appendChild(ice);
+      }
+
+      toppingContainer.innerHTML = '';
+      activeToppings.forEach((_, key) => {
+        const div = document.createElement('div');
+        div.className = `topping-layer topping-${key}`;
+        div.style.height = '24px';
+        toppingContainer.appendChild(div);
+      });
+
+      const bowlOfRice = (total / 280).toFixed(1);
+      foodEquiv.innerText = `相當於約 ${bowlOfRice} 碗白飯 🍚 (或 ${(total / 550).toFixed(1)} 份大麥克)`;
+
+      cupWrapper.classList.remove('shake');
+      if (total <= 250) {
+        warnBadge.innerText = "負擔輕盈 🌱";
+        warnBadge.style.background = "#dcfce7";
+        warnBadge.style.color = "#166534";
+      } else if (total <= 500) {
+        warnBadge.innerText = "偶爾享受 🧋";
+        warnBadge.style.background = "#fef9c3";
+        warnBadge.style.color = "#854d0e";
+      } else {
+        warnBadge.innerText = "熱量炸彈 💥 建議分次喝！";
+        warnBadge.style.background = "#fee2e2";
+        warnBadge.style.color = "#991b1b";
+        void cupWrapper.offsetWidth;
+        cupWrapper.classList.add('shake');
+      }
+
+      runVal.innerText = (total / 60).toFixed(1) + " km";
+      ropeVal.innerText = Math.round(total / 10) + " 分鐘";
+      stairsVal.innerText = Math.round(total / 0.1) + " 階";
+    }
+
+    document.getElementById('randomBtn').addEventListener('click', () => {
+      const baseOptions = document.querySelectorAll('#baseGroup .btn-option');
+      baseOptions[Math.floor(Math.random() * baseOptions.length)].click();
+
+      const sugarOptions = document.querySelectorAll('#sugarGroup .btn-option');
+      sugarOptions[Math.floor(Math.random() * sugarOptions.length)].click();
+
+      toppingBtns.forEach(btn => {
+        if (btn.classList.contains('active')) btn.click();
+        if (Math.random() > 0.5) btn.click();
+      });
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.querySelector('#sizeGroup .btn-option').click();
+      document.querySelector('#baseGroup .btn-option').click();
+      document.querySelectorAll('#sugarGroup .btn-option')[1].click();
+      document.querySelectorAll('#iceGroup .btn-option')[1].click();
+      toppingBtns.forEach(btn => {
+        if (btn.classList.contains('active')) btn.click();
+      });
+    });
+
+    document.getElementById('shareBtn').addEventListener('click', () => {
+      let toppingsArr = [];
+      activeToppings.forEach(item => toppingsArr.push(item.name));
+      const toppingStr = toppingsArr.length > 0 ? ` + ${toppingsArr.join('、')}` : '';
+      const text = `【今日手搖飲特調】\n🥤 品項：${baseName} (${sugarName})${toppingStr}\n🔥 總熱量：${totalCalEl.innerText} kcal\n🏃 需慢跑：${runVal.innerText}！`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert("已複製飲料小卡到剪貼簿！可直接貼給朋友分享～");
+      });
+    });
+
+    updateApp();
+  </script>
+</body>
+</html>
